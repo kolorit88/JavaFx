@@ -1,101 +1,134 @@
 package org.example.javafx;
 import javafx.application.Application;
-import javafx.geometry.*;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class RestaurantOrder extends Application {
-    private final Map<String, Integer> order = new HashMap<>();
-    private final Label totalLabel = new Label("Итого: 0.00");
-    HashMap<String, Double> dishes = new HashMap<>();
+
+    private ListView<String> dishListView;
+    private final ObservableList<String> dishes = FXCollections.observableArrayList();
+    private final Map<String, Double> dishPrices = new HashMap<>();
+    private final Map<String, Integer> dishQuantities = new HashMap<>();
+    Spinner<Integer> quantitySpinner = new Spinner<>(1, 10, 1, 1);
+    TextArea orderTextArea = new TextArea();
 
     @Override
     public void start(Stage stage) {
-        // Создание меню блюд
-        dishes.put("Пицца", 300.0);
-        dishes.put("Суп", 150.0);
-        dishes.put("Салат", 100.0);
-        dishes.put("Десерт", 125.0);
+        // Инициализация данных о блюдах
+        dishes.addAll("Пицца", "Суши", "Салат", "Десерт");
+        dishPrices.put("Пицца", 100.0);
+        dishPrices.put("Суши", 150.0);
+        dishPrices.put("Салат", 50.0);
+        dishPrices.put("Десерт", 30.0);
 
+        // Создание элементов GUI
+        dishListView = new ListView<>(dishes);
+        dishListView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
-        // Создание элементов для меню
-        VBox menuVBox = new VBox(10);
-        menuVBox.setPadding(new Insets(20));
-        menuVBox.setAlignment(Pos.CENTER);
+        Label orderLabel = new Label("Ваш заказ:");
+        orderTextArea.setEditable(false);
 
-        for (Map.Entry<String, Double> entry : dishes.entrySet()) {
-            // Разбиваем строку на название и цену
-            String dish = entry.getKey();
-            Double cost = entry.getValue();
+        Label quantityLabel = new Label("Количество:");
 
-            // Создаем элементы для блюда
-            CheckBox dishCheckBox = new CheckBox(dish);
-            TextField quantityField = new TextField("1");
-            quantityField.setVisible(false);
-            quantityField.setPrefWidth(50);
+        Button addToOrderButton = new Button("Добавить в заказ");
+        addToOrderButton.setOnAction(event -> addToOrder());
 
-            // Обработчик события для чекбокса
-            dishCheckBox.setOnAction(event -> {
-                if (dishCheckBox.isSelected()) {
-                    quantityField.setVisible(true);
-                    quantityField.setText("1");
-                    order.put(dish, Integer.parseInt(quantityField.getText()));
-                } else {
-                    quantityField.setVisible(false);
-                    order.remove(dish);
-                }
-                updateTotal();
-            });
+        Button checkoutButton = new Button("Оформить заказ");
+        checkoutButton.setOnAction(event -> checkout());
 
-            quantityField.textProperty().addListener((observable, oldValue, newValue) -> {
-                if (!newValue.isEmpty()) {
-                    order.put(dish, Integer.parseInt(newValue));
-                } else {
-                    order.put(dish, 0);
-                }
-                updateTotal();
-            });
+        // Размещение элементов в GridPane
+        GridPane gridPane = new GridPane();
+        gridPane.setAlignment(Pos.CENTER);
+        gridPane.setHgap(10);
+        gridPane.setVgap(10);
+        gridPane.setPadding(new Insets(25, 25, 25, 25));
 
-            // Добавление элементов в меню
-            HBox dishHBox = new HBox(10, dishCheckBox, quantityField);
-            menuVBox.getChildren().add(dishHBox);
-        }
+        gridPane.add(new Label("Меню:"), 0, 0);
+        gridPane.add(dishListView, 0, 1, 2, 1);
+        gridPane.add(quantityLabel, 0, 2);
+        gridPane.add(quantitySpinner, 1, 2);
+        gridPane.add(addToOrderButton, 0, 3);
+        gridPane.add(orderLabel, 0, 4);
+        gridPane.add(orderTextArea, 0, 5, 2, 1);
+        gridPane.add(checkoutButton, 0, 6);
 
-        // Создание панели для отображения чека
-        VBox checkVBox = new VBox(10);
-        checkVBox.setPadding(new Insets(20));
-        checkVBox.setAlignment(Pos.CENTER);
-        checkVBox.getChildren().add(new Label("Ваш заказ:"));
-        checkVBox.getChildren().add(totalLabel);
-
-        // Создание горизонтальной панели для меню и чека
-        HBox rootHBox = new HBox(20, menuVBox, checkVBox);
-
-        // Создание сцены и ее добавление в окно
-        Scene scene = new Scene(rootHBox, 500, 300);
+        // Создание сцены и отображение окна
+        Scene scene = new Scene(gridPane, 400, 450);
+        stage.setTitle("Ресторан");
+        stage.setResizable(false);
         stage.setScene(scene);
-        stage.setTitle("Заказ в ресторане");
         stage.show();
     }
 
-    private void updateTotal() {
-        double total = 0;
-        for (Map.Entry<String, Integer> entry : order.entrySet()) {
-            String dish = entry.getKey();
-            Integer quantity = entry.getValue();
+    // Метод для добавления выбранных блюд в заказ
+    private void addToOrder() {
+        String dish = dishListView.getSelectionModel().getSelectedItem();
+        if (dish != null) {
+            int quantity = quantitySpinner.getValue();
+            dishQuantities.put(dish, quantity);
+            updateOrderTextArea();
+            dishListView.getSelectionModel().clearSelection();
+        }
+    }
 
-            total += dishes.get(dish) * quantity;
+    // Метод для оформления заказа
+    private void checkout() {
+        if (dishQuantities.isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Пустой заказ");
+            alert.setHeaderText(null);
+            alert.setContentText("Ваш заказ пуст. Выберите блюда.");
+            alert.showAndWait();
+            return;
         }
 
-        totalLabel.setText("Итого: " + String.format("%.2f", total));
+        double totalCost = 0;
+
+        for (Map.Entry<String, Integer> entry : dishQuantities.entrySet()) {
+            String dish = entry.getKey();
+            int quantity = entry.getValue();
+            double dishCost = dishPrices.get(dish) * quantity;
+            totalCost += dishCost;
+        }
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Ваш заказ");
+        alert.setHeaderText(null);
+        alert.setContentText(orderTextArea.getText() + "\n" + "Итого: " + String.format("%.2f", totalCost) + "руб");
+        alert.showAndWait();
+
+        // Сброс заказа после оформления
+        dishQuantities.clear();
+        updateOrderTextArea();
+    }
+
+    // Метод для обновления текста в области заказа
+    private void updateOrderTextArea() {
+        StringBuilder orderText = new StringBuilder();
+
+        if (dishQuantities.isEmpty()) {
+            orderText.append("Ваш заказ пуст.");
+        } else {
+            for (Map.Entry<String, Integer> entry : dishQuantities.entrySet()) {
+                String dish = entry.getKey();
+                int quantity = entry.getValue();
+                orderText.append(dish).append(": ").append(quantity).append(" шт.\n");
+            }
+        }
+
+        orderTextArea.setText(orderText.toString());
     }
 
     public static void main(String[] args) {
-        launch(args);
-
+        launch();
     }
 }
